@@ -1,0 +1,8 @@
+mkdir /home/minio_data
+docker run -itd --name minio \
+    --publish 9000:9000 \
+    --publish 9001:9001 \
+    -e MINIO_ROOT_PASSWORD="hyf3513MINIO" \
+    --volume /home/minio_data:/bitnami/minio/data \
+    bitnami/minio:latest
+

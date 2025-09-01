@@ -1,0 +1,16 @@
+{
+    "id":"123",
+    "prefix":"test",
+    "psmiles":"*OC([*])=O",
+    "n_repeat":6,
+    "random_walk":true,
+    "temp":298,
+    "high_temp":600,
+    "prev_nvt_steps":60000,
+    "cool_steps":500000,
+    "final_nvt_steps":1000000,
+    "time_step_low":0.5,
+    "time_step":2.0,
+    "box_length":150.0,
+    "comm_cutoff":12.0
+}

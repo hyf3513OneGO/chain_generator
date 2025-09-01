@@ -1,0 +1,14 @@
+/results/*
+/lmp_dir
+/temp_dir
+/temp_save_dir
+/work_dir
+/configs/*.json
+*.dat
+__pycache__/
+*.py[cod]
+*$py.class
+*.dat
+*.out
+*.log
+output_dir/*
