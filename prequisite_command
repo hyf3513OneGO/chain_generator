@@ -6,3 +6,4 @@ docker run -itd --name minio \
     --volume /home/minio_data:/bitnami/minio/data \
     bitnami/minio:latest
 
+pip install aio_pika minio

@@ -12,3 +12,4 @@ __pycache__/
 *.out
 *.log
 output_dir/*
+log.lammps

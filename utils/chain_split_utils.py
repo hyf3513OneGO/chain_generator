@@ -95,8 +95,8 @@ def extract_rigid_from_monomers(monomer_list,keypoints)->Tuple[np.ndarray,np.nda
     local_monomers = []
 
     for idx,monomer in enumerate(monomer_list):
-        x1 = np.array([monomer.GetConformer().GetAtomPosition(s1).x,monomer.GetConformer().GetAtomPosition(s1).y,monomer.GetConformer().GetAtomPosition(s1).z])
-        x2 = np.array([monomer.GetConformer().GetAtomPosition(n1).x,monomer.GetConformer().GetAtomPosition(n1).y,monomer.GetConformer().GetAtomPosition(n1).z])
+        x1 = np.array([monomer.GetConformer().GetAtomPosition(n1).x,monomer.GetConformer().GetAtomPosition(n1).y,monomer.GetConformer().GetAtomPosition(n1).z])
+        x2 = np.array([monomer.GetConformer().GetAtomPosition(s1).x,monomer.GetConformer().GetAtomPosition(s1).y,monomer.GetConformer().GetAtomPosition(s1).z])
         x3 = np.array([monomer.GetConformer().GetAtomPosition(s2).x,monomer.GetConformer().GetAtomPosition(s2).y,monomer.GetConformer().GetAtomPosition(s2).z])
         R, t = compute_rigid_frame_from_three_atoms(x1, x2, x3)
         R_list.append(R)

@@ -2,7 +2,7 @@ from minio import Minio
 from minio.error import S3Error
 import os
 import json
-
+from tqdm import tqdm
 class MinioConfig:
     def __init__(self, config_path):
         self.config_path = config_path
@@ -75,11 +75,73 @@ class MinioManager:
         :param bucket_name: 桶名称
         """
         # 首先删除桶内所有对象
-        objects_to_delete = self.client.list_objects(bucket_name, recursive=True)
-        for obj in objects_to_delete:
-            self.client.remove_object(bucket_name, obj.object_name)
+        import concurrent.futures
+        objects_to_delete = list(self.client.list_objects(bucket_name, recursive=True))
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            list(tqdm(executor.map(lambda obj: self.client.remove_object(bucket_name, obj.object_name), objects_to_delete), total=len(objects_to_delete)))
         # 删除桶
         self.client.remove_bucket(bucket_name)
+    def count_folders_in_bucket(self, bucket_name, prefix=""):
+        """
+        统计指定桶（及可选前缀）下有多少个文件夹（以'/'分隔的目录）
+        :param bucket_name: 桶名称
+        :param prefix: 前缀路径（可选）
+        :return: 文件夹数量
+        """
+        if not self.client.bucket_exists(bucket_name):
+            raise ValueError(f"桶 {bucket_name} 不存在")
+        folder_set = set()
+        objects = self.client.list_objects(bucket_name, prefix=prefix, recursive=True)
+        for obj in objects:
+            object_name = obj.object_name
+            # 去除前缀
+            if prefix and object_name.startswith(prefix):
+                rel_path = object_name[len(prefix):]
+                if rel_path.startswith("/"):
+                    rel_path = rel_path[1:]
+            else:
+                rel_path = object_name
+            # 分析路径中的文件夹
+            parts = rel_path.split("/")
+            # 只统计有文件夹的对象
+            for i in range(1, len(parts)):
+                folder_path = "/".join(parts[:i])
+                folder_set.add(folder_path)
+        return len(folder_set)
+    def download_bucket(self, bucket_name, dest_folder, prefix="", num_workers=8):
+        """
+        下载指定桶（可选前缀）下的所有对象到本地文件夹，支持多线程和进度条
+        :param bucket_name: 桶名称
+        :param dest_folder: 本地目标文件夹
+        :param prefix: 桶内前缀（可选）
+        :param num_workers: 并发线程数
+        """
+        import concurrent.futures
+        from tqdm import tqdm
+
+        if not self.client.bucket_exists(bucket_name):
+            raise ValueError(f"桶 {bucket_name} 不存在")
+        # 获取所有对象列表
+        objects = list(self.client.list_objects(bucket_name, prefix=prefix, recursive=True))
+        total = len(objects)
+        if total == 0:
+            return
+
+        def download_one(obj):
+            object_name = obj.object_name
+            # 计算本地保存路径
+            rel_path = object_name[len(prefix):] if prefix and object_name.startswith(prefix) else object_name
+            if rel_path.startswith("/"):
+                rel_path = rel_path[1:]
+            local_path = os.path.join(dest_folder, rel_path)
+            local_dir = os.path.dirname(local_path)
+            if not os.path.exists(local_dir):
+                os.makedirs(local_dir, exist_ok=True)
+            self.client.fget_object(bucket_name, object_name, local_path)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            list(tqdm(executor.map(download_one, objects), total=total, desc="下载进度"))
+
 if __name__ == "__main__":
     import os
     os.chdir("../")
@@ -90,10 +152,5 @@ if __name__ == "__main__":
         secret_key="hyf3513MINIO",
         secure=False
     )
-    # Minio 的 bucket 名称不能包含斜杠（/），即不能有“mini/test-1”这种双层目录结构。
-    # 正确做法是 bucket 只用一级名称，比如 "mini"，然后通过 object_name 的前缀来实现“目录”效果。
-    # 下面演示如何在 bucket "mini" 下上传到 "test-1/..." 这样的“目录”结构：
-
-    minio_manager.make_bucket("mini")
-    minio_manager.upload_folder("mini", "./results/mini/task_0_repeat-5-monomers", prefix="test-1")
     minio_manager.remove_bucket("mini")
+    # minio_manager.download_bucket("mini", "./results/mini","")
