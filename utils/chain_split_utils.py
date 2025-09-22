@@ -211,3 +211,21 @@ def extract_save_monomers(mol=None,sdf_path=None,psmiles=None,save_dir=None)->li
     np.save(os.path.join(save_dir,"keypoints.npy"),keypoints)
     np.save(os.path.join(save_dir,"filled_index.npy"),filled_index)
     return local_monomers,R_list,t_list
+def calc_t_list(local_monomer_mols_list,R_list,psmiles):
+    t = [0,0,0]
+    t_calc_list = [t]
+    key_point_list,processed_mol,processed_smi = remove_star_atoms(psmiles)
+    n1,s1,n2,s2 = key_point_list
+    for i in range(len(local_monomer_mols_list)):
+        r = R_list[i]
+        pos_local = np.array(get_coord_from_mol(local_monomer_mols_list[i]))
+        x1 = pos_local[n1]
+        x2 = pos_local[s1]
+        x3 = pos_local[s2]
+        r_rec,t_rec = compute_rigid_frame_from_three_atoms(x1,x2,x3)
+        local_coord = to_local_coords(pos_local,r_rec,t_rec)
+        pos_rotated = to_global_coords(local_coord,r,t)
+        t = pos_rotated[n2].tolist()
+        t_calc_list.append(t)
+    t_calc_list = np.array(t_calc_list)
+    return t_calc_list,key_point_list

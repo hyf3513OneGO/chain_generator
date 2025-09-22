@@ -56,6 +56,7 @@ class HomoChainBuilder:
             n = poly.calc_n_from_num_atoms(mol, n_atoms, terminal1=ter_head,terminal2=ter_tail)
         elif n_repeat is not None:
             n = n_repeat
+        n = int(n)
         if random_walk:
             homopoly = poly.polymerize_rw(mol, n)
             homopoly = poly.terminate_rw(homopoly,mol1=ter_head,mol2=ter_tail,terminate_tail=True)
