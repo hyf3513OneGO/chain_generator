@@ -133,7 +133,10 @@ esac
 EOF
 
 # 立即生效
-source ~/.bashrc
+set +u
+# shellcheck disable=SC1090
+source ~/.bashrc || true
+set -u
 
 # ---------- 提示 ----------
 cat <<EOF
