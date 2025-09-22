@@ -279,7 +279,7 @@ async def handle_message(message: IncomingMessage, config: ChainRelaxConfig, con
             node_print(config.node, f"发送失败消息时出现未知错误: {publish_error}，任务 {task_id} 失败: {e}")
 
         # 重入队（最佳努力）
-        await safe_settle(message, "nack", requeue=True)
+        await safe_settle(message, "ack")
 
 
 # =========================

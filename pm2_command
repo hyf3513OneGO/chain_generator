@@ -1,2 +1,1 @@
-cd /data/yifei/2025.08/chain_generator/
-pm2 start /data/yifei/2025.08/chain_generator/chain_relax_worker.py --interpreter /home/anaconda3/envs/chaingen/bin/python --name chain_relax_worker -i 16 -- --workers 1
+pm2 start chain_relax_worker.py --interpreter $CONDA_PREFIX/bin/python --name chain_relax_worker -i 16 -- --workers 1
