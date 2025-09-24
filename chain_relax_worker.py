@@ -229,7 +229,7 @@ async def handle_message(message: IncomingMessage, config: ChainRelaxConfig, con
         # 计算上传耗时
         upload_duration = time.time() - upload_start_time
         
-        node_print(config.node, f"Task {task_id} uploaded to minio successfully. Upload duration: {upload_duration:.2f}秒")
+        node_print(config.node, f"Task {task_id} uploaded to minio successfully. Upload duration: {upload_duration:.2f} seconds")
         node_print(config.node, f"Task {task_id} completed successfully.")
 
         # 3) 成功路径 ack（最佳努力）
