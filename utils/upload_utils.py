@@ -75,8 +75,10 @@ class MinioManager:
         :param bucket_name: 桶名称
         """
         # 首先删除桶内所有对象
+        print("start to delete bucket: ", bucket_name)
         import concurrent.futures
         objects_to_delete = list(self.client.list_objects(bucket_name, recursive=True))
+        print("total objects to delete: ", len(objects_to_delete))
         with concurrent.futures.ThreadPoolExecutor() as executor:
             list(tqdm(executor.map(lambda obj: self.client.remove_object(bucket_name, obj.object_name), objects_to_delete), total=len(objects_to_delete)))
         # 删除桶

@@ -49,9 +49,9 @@ class HomoChainBuilder:
         params.randomSeed = 42
         AllChem.EmbedMolecule(mol, params)
         AllChem.MMFFOptimizeMolecule(mol)
-        qm.assign_charges(mol, charge='RESP', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
-        qm.assign_charges(ter_head, charge='RESP', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
-        qm.assign_charges(ter_tail, charge='RESP', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
+        qm.assign_charges(mol, charge='gasteiger', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
+        qm.assign_charges(ter_head, charge='gasteiger', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
+        qm.assign_charges(ter_tail, charge='gasteiger', work_dir=self.work_dir, tmp_dir=self.temp_dir, opt=False, omp=self.omp_psi4, memory=self.mem_psi4)
         if n_repeat is None and n_atoms is not None:
             n = poly.calc_n_from_num_atoms(mol, n_atoms, terminal1=ter_head,terminal2=ter_tail)
         elif n_repeat is not None:
