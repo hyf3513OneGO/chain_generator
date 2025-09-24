@@ -58,9 +58,11 @@ class HomoChainBuilder:
             n = n_repeat
         n = int(n)
         if random_walk:
+            print("use random walk")
             homopoly = poly.polymerize_rw(mol, n)
             homopoly = poly.terminate_rw(homopoly,mol1=ter_head,mol2=ter_tail,terminate_tail=True)
         else:
+            print("not use random walk")
             homopoly = poly.polymerize_mols(mol, n)
             homopoly = poly.terminate_mols(homopoly,mol1=ter_head,mol2=ter_tail,terminate_tail=True)
         return homopoly

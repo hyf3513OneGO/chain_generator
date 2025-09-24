@@ -1,1 +1,1 @@
-pm2 start chain_relax_worker.py --interpreter $CONDA_PREFIX/bin/python --name chain_relax_worker -i 16 -- --workers 1
+pm2 start chain_relax_worker.py --interpreter $CONDA_PREFIX/bin/python --name chain_relax_worker -i 8 -- --workers 1
