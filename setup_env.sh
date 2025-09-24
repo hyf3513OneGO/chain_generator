@@ -155,6 +155,26 @@ conda activate "$CONDA_ENV"
 ###############################################################################
 # 7) 安装 nvm / node / pm2（仅当 HTTPS 正常时）
 ###############################################################################
+# 检测并安装 curl（如果不存在）
+if ! command -v curl &> /dev/null; then
+  log "curl 未安装，正在安装 curl..."
+  if command -v apt-get &> /dev/null; then
+    sudo apt-get update -y && sudo apt-get install -y curl
+  elif command -v yum &> /dev/null; then
+    sudo yum install -y curl
+  elif command -v dnf &> /dev/null; then
+    sudo dnf install -y curl
+  elif command -v pacman &> /dev/null; then
+    sudo pacman -S --noconfirm curl
+  else
+    log "无法自动安装 curl，请手动安装后重新运行脚本"
+    exit 1
+  fi
+  log "curl 安装完成"
+else
+  log "curl 已安装"
+fi
+
 log "检测 HTTPS 可用性，用于安装 nvm/node..."
 if https_ok; then
   log "HTTPS 正常，安装 nvm..."
@@ -166,6 +186,9 @@ if https_ok; then
   . "$HOME/.nvm/nvm.sh"
 
   log "安装 Node.js v22 与 pm2..."
+  # 设定环境变量
+  export NVM_NODEJS_ORG_MIRROR=https://mirrors.cernet.edu.cn/nodejs-release/
+  # 然后正常使用
   nvm install 22
   npm install pm2@latest -g
 
