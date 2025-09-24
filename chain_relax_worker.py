@@ -222,8 +222,14 @@ async def handle_message(message: IncomingMessage, config: ChainRelaxConfig, con
         # 2) 阻塞 I/O（MinIO 上传）放线程池，避免阻塞事件循环与心跳
         save_folder = os.path.join("results", msg.get("prefix", ""), task_id)
         upload_fn = partial(minio_helper.upload_folder, msg.get("prefix"), save_folder, task_id)
+        
+        # 记录上传开始时间
+        upload_start_time = time.time()
         await loop.run_in_executor(None, upload_fn)
-        node_print(config.node, f"Task {task_id} uploaded to minio successfully.")
+        # 计算上传耗时
+        upload_duration = time.time() - upload_start_time
+        
+        node_print(config.node, f"Task {task_id} uploaded to minio successfully. Upload duration: {upload_duration:.2f}秒")
         node_print(config.node, f"Task {task_id} completed successfully.")
 
         # 3) 成功路径 ack（最佳努力）
