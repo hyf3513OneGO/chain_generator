@@ -504,8 +504,8 @@ async def main():
     parser.add_argument('--config', help='Path to configuration file', default='configs/config.json')
     parser.add_argument('--workers', help='Num for workers', default=1)
     args = parser.parse_args()
-    shutil.rmtree("lmp_dir", ignore_errors=True)
-    tasks = [asyncio.create_task(worker_main(f"worker_{uuid.uuid4()}", args.config)) for _ in range(int(args.workers))]
+    worker_uuids = [uuid.uuid4() for _ in range(int(args.workers))]
+    tasks = [asyncio.create_task(worker_main(f"worker_{worker_uuid}", args.config)) for worker_uuid in worker_uuids]
 
     try:
         await asyncio.gather(*tasks)
