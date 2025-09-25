@@ -132,12 +132,9 @@ esac
 # --- end ---
 EOF
 
-# 立即生效
-set +u
-# shellcheck disable=SC1090
-source ~/.bashrc || true
-set -u
-
+# 注意：在脚本中 source ~/.bashrc 不会影响当前终端会话
+# 用户需要手动执行 'source ~/.bashrc' 或重新打开终端
+echo "注意：请手动执行 'source ~/.bashrc' 或重新打开终端以使环境变量生效"
 # ---------- 提示 ----------
 cat <<EOF
 
