@@ -95,9 +95,24 @@ class HomoChainBuilder:
         )
         return mol_relaxed
     def fromSmiles(self,psmiles,n_repeat=None,n_atoms=None,save_dir:str=None,random_walk=False,args_dict:dict=None):
+        import time
+        
+        # 创建分子
+        start_time = time.time()
         mol_init = self.create_mol(psmiles,n_repeat,n_atoms,random_walk)
+        create_mol_time = time.time() - start_time
+        
+        # 复制分子
+        start_time = time.time()
         mol = Chem.Mol(mol_init)
+        copy_mol_time = time.time() - start_time
+        
+        # 松弛构象
+        start_time = time.time()
         mol_relaxed = self.relax_conf(mol,save_dir,args_dict)
+        relax_conf_time = time.time() - start_time
+        
+        print(f"[时间统计] 创建分子: {create_mol_time:.3f}s, 复制分子: {copy_mol_time:.3f}s, 松弛构象: {relax_conf_time:.3f}s")
         return mol_relaxed,mol_init
     def save_mol(self,mol:rdkit.Chem.rdchem.Mol,save_path:str):
         writer = Chem.SDWriter(save_path)

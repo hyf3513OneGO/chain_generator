@@ -6,6 +6,21 @@ import time
 import os
 import shutil
 from functools import partial
+import gc
+import shutil
+# =========================
+# 可选内存监控（通过环境变量 CHAIN_RELAX_MEMLOG 控制）
+# =========================
+MEMLOG_ENABLED = os.getenv("CHAIN_RELAX_MEMLOG", "0") == "1"
+try:
+    import psutil  # 仅在 MEMLOG_ENABLED 时使用
+except Exception:
+    psutil = None
+try:
+    import tracemalloc  # 仅在 MEMLOG_ENABLED 时使用
+except Exception:
+    tracemalloc = None
+MEMLOG_TOPN = int(os.getenv("CHAIN_RELAX_MEMLOG_TOPN", "5"))
 
 from rdkit import Chem
 from aio_pika import connect_robust, IncomingMessage, Message
@@ -112,6 +127,23 @@ class ConnectionManager:
 # =========================
 # 计算与文件处理
 # =========================
+def _get_folder_size_mb(folder_path: str) -> float:
+    """
+    计算文件夹总大小（MB）。用于评估上传数据量，辅助定位上传阶段耗时增长是否与数据量相关。
+    """
+    total_bytes = 0
+    try:
+        for root, _, files in os.walk(folder_path):
+            for name in files:
+                fp = os.path.join(root, name)
+                try:
+                    total_bytes += os.path.getsize(fp)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return total_bytes / (1024 * 1024)
+
 def process_relaxation_sync(msg: dict, config: ChainRelaxConfig, worker_id: str):
     task_id = msg["id"]
     prefix_folder = msg["prefix"]
@@ -146,14 +178,41 @@ def process_relaxation_sync(msg: dict, config: ChainRelaxConfig, worker_id: str)
 
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
-
+    
+    # 保存松弛后的分子
+    start_time = time.time()
     hcb.save_mol(homopoly_relaxed, os.path.join(save_folder, "homopoly_relaxed.sdf"))
+    save_relaxed_time = time.time() - start_time
+    
+    # 保存初始分子
+    start_time = time.time()
     hcb.save_mol(homopoly_init, os.path.join(save_folder, "homopoly_init.sdf"))
+    save_init_time = time.time() - start_time
+    
+    # 保存PSMILES
+    start_time = time.time()
     with open(os.path.join(save_folder, "psmiles.txt"), "w") as f:
         f.write(msg["psmiles"])
+    save_psmiles_time = time.time() - start_time
 
+    # 移除氢原子
+    start_time = time.time()
     homopoly_relaxed = Chem.RemoveHs(homopoly_relaxed)
+    remove_hs_time = time.time() - start_time
+    
+    # 提取并保存单体
+    start_time = time.time()
     extract_save_monomers(mol=homopoly_relaxed, psmiles=psmiles, save_dir=save_folder)
+    extract_monomers_time = time.time() - start_time
+    
+    print(f"[时间统计] 保存松弛分子: {save_relaxed_time:.3f}s, 保存初始分子: {save_init_time:.3f}s, 保存PSMILES: {save_psmiles_time:.3f}s, 移除氢原子: {remove_hs_time:.3f}s, 提取单体: {extract_monomers_time:.3f}s")
+    # 显式删除大型对象以便尽早释放 C++ 后端内存
+    try:
+        del homopoly_relaxed
+        del homopoly_init
+        del hcb
+    except Exception:
+        pass
     return task_id, msg
 
 
@@ -215,7 +274,30 @@ async def handle_message(message: IncomingMessage, config: ChainRelaxConfig, con
 
     try:
         # 1) 计算密集：线程池/进程池。当前为线程池；如需更稳可切换 ProcessPoolExecutor。
+        compute_start_time = time.time()
+        rss_before_mb = None
+        if MEMLOG_ENABLED and psutil is not None:
+            try:
+                rss_before_mb = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+            except Exception:
+                rss_before_mb = None
+
         result = await loop.run_in_executor(None, run_task_in_subprocess, msg, config, worker_id)
+        compute_duration = time.time() - compute_start_time
+        if MEMLOG_ENABLED:
+            rss_after_mb = None
+            try:
+                if psutil is not None:
+                    rss_after_mb = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+            except Exception:
+                rss_after_mb = None
+            if rss_before_mb is not None and rss_after_mb is not None:
+                delta_mb = rss_after_mb - rss_before_mb
+                node_print(config.node, f"Task {task_id} compute finished. Duration: {compute_duration:.2f}s, RSS before/after: {rss_before_mb:.1f}/{rss_after_mb:.1f} MB, +{delta_mb:.1f} MB")
+            else:
+                node_print(config.node, f"Task {task_id} compute finished. Duration: {compute_duration:.2f}s")
+        else:
+            node_print(config.node, f"Task {task_id} compute finished. Duration: {compute_duration:.2f}s")
         if result[0] == "error":
             raise RuntimeError(result[2])
 
@@ -228,12 +310,20 @@ async def handle_message(message: IncomingMessage, config: ChainRelaxConfig, con
         await loop.run_in_executor(None, upload_fn)
         # 计算上传耗时
         upload_duration = time.time() - upload_start_time
+        # 统计上传数据量（MB）
+        upload_size_mb = _get_folder_size_mb(save_folder)
         
-        node_print(config.node, f"Task {task_id} uploaded to minio successfully. Upload duration: {upload_duration:.2f} seconds")
+        node_print(config.node, f"Task {task_id} uploaded to minio successfully. Upload duration: {upload_duration:.2f} seconds, size: {upload_size_mb:.2f} MB")
         node_print(config.node, f"Task {task_id} completed successfully.")
 
         # 3) 成功路径 ack（最佳努力）
         await safe_settle(message, "ack")
+
+        # 4) 任务结束后主动触发 GC，减少峰值驻留
+        try:
+            gc.collect()
+        except Exception:
+            pass
 
         # 如需幂等标记，可在此处最后一步落 "_DONE" 文件或写数据库
 
@@ -343,6 +433,13 @@ async def worker_main(worker_id: str, config_path: str):
     last_health_check = time.time()
     health_check_interval = 30
 
+    # 启动内存快照（可选）
+    if MEMLOG_ENABLED and tracemalloc is not None:
+        try:
+            tracemalloc.start()
+        except Exception:
+            pass
+
     try:
         while True:
             await asyncio.sleep(1)
@@ -358,6 +455,25 @@ async def worker_main(worker_id: str, config_path: str):
                         worker_print(config.node, worker_id, f"重连成功并恢复消费")
                     except Exception as reconnect_error:
                         worker_print(config.node, worker_id, f"重连失败: {reconnect_error}")
+
+                # 内存监控：输出进程 RSS 与 tracemalloc TopN
+                if MEMLOG_ENABLED:
+                    try:
+                        rss_mb = None
+                        if psutil is not None:
+                            rss_mb = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+                        if rss_mb is not None:
+                            worker_print(config.node, worker_id, f"[MEM] RSS={rss_mb:.1f} MB")
+                        if tracemalloc is not None:
+                            try:
+                                snapshot = tracemalloc.take_snapshot()
+                                top_stats = snapshot.statistics('lineno')[:MEMLOG_TOPN]
+                                for i, stat in enumerate(top_stats, 1):
+                                    worker_print(config.node, worker_id, f"[MEM] TOP{i}: {stat}")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
                 last_health_check = now
 
     except KeyboardInterrupt:
@@ -388,7 +504,7 @@ async def main():
     parser.add_argument('--config', help='Path to configuration file', default='configs/config.json')
     parser.add_argument('--workers', help='Num for workers', default=1)
     args = parser.parse_args()
-
+    shutil.rmtree("lmp_dir", ignore_errors=True)
     tasks = [asyncio.create_task(worker_main(f"worker_{uuid.uuid4()}", args.config)) for _ in range(int(args.workers))]
 
     try:

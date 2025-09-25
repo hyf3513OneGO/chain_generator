@@ -192,20 +192,43 @@ def save_to_sdf(mol,sdf_path:str):
     writer.close()
 def extract_save_monomers(mol=None,sdf_path=None,psmiles=None,save_dir=None)->list[rdkit.Chem.rdchem.Mol]:
     from rdkit.Chem import AllChem, rdMolAlign
+    import time
+    
+    # 提取单体
+    start_time = time.time()
     if mol is not None:
         keypoints,filled_index,mol_noH,monomer_list = extract_monomers(mol=mol,psmiles=psmiles)
     if sdf_path is not None:
         keypoints,filled_index,mol_noH,monomer_list = extract_monomers(sdf_file=sdf_path,psmiles=psmiles)
     if mol is None and sdf_path is None:
         raise ValueError("Either mol or sdf_path must be provided")
+    extract_monomers_time = time.time() - start_time
+    
+    # 提取刚体变换
+    start_time = time.time()
     R_list, t_list, local_monomers = extract_rigid_from_monomers(monomer_list,keypoints)
+    extract_rigid_time = time.time() - start_time
+    
+    # 重组分子并验证
+    start_time = time.time()
     merged_mol = compose_monomers_from_local_monomers(local_monomers,R_list,t_list,keypoints)
     rmsd = rdMolAlign.GetBestRMS(merged_mol,mol_noH)
     assert rmsd<1e-4, "The merged mol is not the same as the original mol"
+    compose_verify_time = time.time() - start_time
+    
+    # 保存局部单体
+    start_time = time.time()
     for i,monomer in enumerate(local_monomers):
         save_to_sdf(monomer,os.path.join(save_dir,f"local_monomer_{i}.sdf"))
+    save_local_time = time.time() - start_time
+    
+    # 保存全局单体
+    start_time = time.time()
     for i,monomer in enumerate(monomer_list):
         save_to_sdf(monomer,os.path.join(save_dir,f"global_monomer_{i}.sdf"))
+    save_global_time = time.time() - start_time
+    
+    print(f"[时间统计] 提取单体: {extract_monomers_time:.3f}s, 提取刚体变换: {extract_rigid_time:.3f}s, 重组验证: {compose_verify_time:.3f}s, 保存局部单体: {save_local_time:.3f}s, 保存全局单体: {save_global_time:.3f}s")
     np.save(os.path.join(save_dir,"R_list.npy"),R_list)
     np.save(os.path.join(save_dir,"t_list.npy"),t_list)
     np.save(os.path.join(save_dir,"keypoints.npy"),keypoints)
