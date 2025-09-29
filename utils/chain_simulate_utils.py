@@ -16,7 +16,7 @@ from utils.chain_split_utils import remove_star_atoms
 
 class HomoChainBuilder:
     def __init__(self,lmps_exec:str,work_dir:str,temp_dir:str,
-    omp_psi4=1,mem_psi4=10000,conf_mm_omp=16,conf_mm_mpi=4,conf_mm_gpu=1,conf_mm_mp=1
+    omp_psi4=1,mem_psi4=10000,conf_mm_omp=16,conf_mm_mpi=1,conf_mm_gpu=1,conf_mm_mp=1
     ) -> rdkit.Chem.rdchem.Mol:
         self.lmps_exec = lmps_exec
         os.environ["OMPI_ALLOW_RUN_AS_ROOT"] = "1"

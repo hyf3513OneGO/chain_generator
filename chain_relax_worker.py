@@ -153,7 +153,8 @@ def process_relaxation_sync(msg: dict, config: ChainRelaxConfig, worker_id: str)
     lmp_temp_dir = os.path.join("lmp_dir", worker_id, config.temp_dir)
     lmp_temp_save_dir = os.path.join("lmp_dir", worker_id, config.temp_save_dir)
 
-    hcb = HomoChainBuilder(lmps_exec=config.lmps_exec, work_dir=lmp_work_dir, temp_dir=lmp_temp_dir, conf_mm_gpu=config.gpu)
+    hcb = HomoChainBuilder(lmps_exec=config.lmps_exec, work_dir=lmp_work_dir, temp_dir=lmp_temp_dir,
+     conf_mm_gpu=config.gpu,omp_psi4=os.cpu_count())
 
     args_dict = {
         'temp': msg["temp"],
